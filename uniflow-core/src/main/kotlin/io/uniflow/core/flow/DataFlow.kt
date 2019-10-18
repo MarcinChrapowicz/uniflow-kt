@@ -45,8 +45,8 @@ interface DataFlow {
      * If any flowError occurs and is not caught, this function catch it
      * @param error
      */
-    suspend fun onError(error: Exception) {
-        UniFlowLogger.logError("Got Flow Error", error)
+    suspend fun onError(error: Exception, currentState: UIState?) {
+        UniFlowLogger.logError("Got error '${error.message}' on state '$currentState'", error)
         throw error
     }
 
@@ -55,7 +55,7 @@ interface DataFlow {
      *
      * @param onStateUpdate - function to produce a new state, from the current state
      */
-    fun setState(onStateUpdate: StateUpdateFunction, onActionError: ErrorFunction) {
+    fun setState(onStateUpdate: StateUpdateFunction, onActionError: StateErrorFunction) {
         onAction(StateAction(onStateUpdate, onActionError))
     }
 
@@ -69,7 +69,7 @@ interface DataFlow {
      *
      * @param onStateAction - function run against the current state
      */
-    fun withState(onStateAction: StateActionFunction, onActionError: ErrorFunction) {
+    fun withState(onStateAction: StateActionFunction, onActionError: StateErrorFunction) {
         onAction(StateAction(onStateAction, onActionError))
     }
 
@@ -85,7 +85,7 @@ interface DataFlow {
      * @param stateFlowFunction - flow state
      * @param errorFunction - flowError function
      */
-    fun stateFlow(onStateFlow: StateFlowFunction, onActionError: ErrorFunction) {
+    fun stateFlow(onStateFlow: StateFlowFunction, onActionError: StateErrorFunction) {
         onStateFlow(StateFlowAction(this, onStateFlow, onActionError))
     }
 
@@ -110,7 +110,7 @@ interface DataFlow {
             if (stateFlowAction.errorFunction != null) {
                 onActionError(StateAction(errorFunction = stateFlowAction.errorFunction), e)
             } else {
-                onError(e)
+                onError(e, getCurrentState())
             }
         }
     }
@@ -168,10 +168,10 @@ interface DataFlow {
                 launchOnIO {
                     if (action.errorFunction != null) {
                         val failState = action.errorFunction.let {
-                            it.invoke(action, error)
+                            it.invoke(action, error, getCurrentState())
                         }
                         failState?.let { applyState(failState) }
-                    } else onError(error)
+                    } else onError(error, getCurrentState())
                 }
             } else {
                 UniFlowLogger.log("DataFlow.onActionError cancelled for $error")
